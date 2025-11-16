@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Áudio MP4 para M4A</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Conversor de Áudio</h1>
+            <p class="subtitle">Converta seus arquivos MP4 para M4A de forma rápida e fácil</p>
+        </header>
+
+        <main>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <h2>Arraste e solte seus arquivos MP4 aqui</h2>
+                    <p>ou</p>
+                    <button class="btn-select" id="selectFileBtn">Selecionar Arquivos (até 15)</button>
+                    <input type="file" id="fileInput" accept=".mp4,audio/mp4,video/mp4" multiple hidden>
+                    <p class="file-limit">Máximo: 15 arquivos</p>
+                </div>
+            </div>
+
+            <div class="files-list" id="filesList" style="display: none;">
+                <div class="files-header">
+                    <h3>Arquivos Selecionados (<span id="fileCount">0</span>)</h3>
+                    <button class="btn-clear-all" id="clearAllBtn">Limpar Todos</button>
+                </div>
+                <div class="files-container" id="filesContainer"></div>
+            </div>
+
+            <div class="settings">
+                <label for="qualitySelect">Qualidade de Áudio:</label>
+                <select id="qualitySelect" class="select-quality">
+                    <option value="128k">128 kbps (Menor tamanho)</option>
+                    <option value="192k" selected>192 kbps (Recomendado)</option>
+                    <option value="256k">256 kbps (Alta qualidade)</option>
+                    <option value="320k">320 kbps (Máxima qualidade)</option>
+                </select>
+            </div>
+
+            <button class="btn-convert" id="convertBtn" disabled>
+                <span class="btn-text">Converter <span id="convertCount">0</span> arquivo(s) para M4A</span>
+                <span class="btn-loader" style="display: none;"></span>
+            </button>
+
+            <div class="progress-container" id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Convertendo...</p>
+            </div>
+
+            <div class="result" id="result" style="display: none;">
+                <div class="result-content">
+                    <div class="success-icon">✓</div>
+                    <h3>Conversão concluída!</h3>
+                    <p id="resultMessage">Seus arquivos foram convertidos com sucesso.</p>
+                    <div id="downloadLinks" class="download-links"></div>
+                    <button id="downloadAllBtn" class="btn-download-all" style="display: none;">⬇️ Baixar Todos (ZIP)</button>
+                </div>
+            </div>
+
+            <div class="error" id="error" style="display: none;">
+                <div class="error-content">
+                    <div class="error-icon">⚠️</div>
+                    <h3>Erro na conversão</h3>
+                    <p id="errorMessage"></p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Conversor de Áudio MP4 para M4A | Desenvolvido com ❤️</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
