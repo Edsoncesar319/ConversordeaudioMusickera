@@ -22,7 +22,7 @@ app = Flask(__name__)
 CORS(app, resources={
     r"/convert": {
         "origins": "*",
-        "methods": ["POST", "OPTIONS", "GET"],  # Adiciona GET temporariamente para debug
+        "methods": ["POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
@@ -96,7 +96,7 @@ def detectar_formato(arquivo):
 
 
 # Rotas de API devem vir antes das rotas de arquivos estáticos
-@app.route('/convert', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/convert', methods=['POST', 'OPTIONS'])
 def convert():
     """Converte arquivo de áudio para outro formato"""
     # Log para debug
@@ -112,16 +112,8 @@ def convert():
         response = jsonify({'status': 'ok'})
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         return response
-    
-    # Permite GET temporariamente para debug
-    if request.method == 'GET':
-        return jsonify({
-            'status': 'ok',
-            'message': 'Rota /convert está funcionando. Use POST para converter arquivos.',
-            'methods_allowed': ['POST', 'OPTIONS']
-        }), 200
     
     if request.method != 'POST':
         return jsonify({

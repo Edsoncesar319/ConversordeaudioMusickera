@@ -248,17 +248,19 @@ async function convertFiles() {
                 });
                 
                 // Determina a URL base do servidor Flask
-                // O Flask sempre roda na porta 5000
+                // Em produção (Vercel), usa URL relativa
+                // Em desenvolvimento local, detecta a porta correta
+                const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
                 const flaskPort = 5000;
                 const currentPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
                 
-                // Se não estiver na porta do Flask, usa a URL completa com a porta correta
+                // Se não estiver na porta do Flask e estiver em desenvolvimento local, usa a URL completa
                 let apiUrl = '/convert';
-                if (currentPort !== flaskPort.toString() && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                if (!isProduction && currentPort !== flaskPort.toString()) {
                     apiUrl = `http://localhost:${flaskPort}/convert`;
                 }
                 
-                console.log('URL da API:', apiUrl, 'Porta atual:', currentPort, 'Porta Flask:', flaskPort);
+                console.log('URL da API:', apiUrl, 'Porta atual:', currentPort, 'Produção:', isProduction);
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
