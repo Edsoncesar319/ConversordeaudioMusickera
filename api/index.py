@@ -1,10 +1,7 @@
-"""Vercel entrypoint exposing the Flask app as a WSGI handler."""
+"""WSGI entrypoint used by Vercel's Python runtime."""
 
-from vercel_wsgi import handle
-from app import app
+from app import app as flask_app
 
-
-def handler(request, context):
-    """WSGI-compatible handler required by Vercel."""
-    return handle(request, context, app)
+# Vercel automatically looks for a WSGI callable named `app`
+app = flask_app
 

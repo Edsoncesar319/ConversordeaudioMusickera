@@ -94,7 +94,7 @@ vercel
 vercel --prod
 ```
 
-> O arquivo `vercel.json` já encaminha todas as rotas para `api/index.py`, que expõe o Flask via `vercel-wsgi`.
+> O arquivo `vercel.json` já encaminha todas as rotas para `api/index.py`, que expõe diretamente o app Flask como WSGI.
 
 ## 💻 Uso
 
