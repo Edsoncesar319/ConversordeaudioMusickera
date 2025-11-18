@@ -173,14 +173,23 @@ def convert():
             input_path_abs = os.path.abspath(input_path)
             output_path_abs = os.path.abspath(output_path)
             
-            # Verifica se o arquivo de entrada é realmente um arquivo de áudio válido
+            # Verifica se o arquivo de entrada é realmente um arquivo de áudio válido (opcional)
+            # Se ffprobe não estiver disponível, tenta converter mesmo assim
             try:
                 probe = ffmpeg.probe(input_path_abs)
                 if 'streams' not in probe or len(probe['streams']) == 0:
                     return jsonify({'error': 'Arquivo não contém streams de áudio válidos'}), 400
-            except ffmpeg.Error as probe_error:
-                probe_msg = probe_error.stderr.decode('utf-8', errors='ignore') if probe_error.stderr else str(probe_error)
-                return jsonify({'error': f'Arquivo de áudio inválido ou corrompido: {probe_msg[:300]}'}), 400
+            except (ffmpeg.Error, FileNotFoundError, OSError) as probe_error:
+                # Se ffprobe não estiver disponível, apenas loga e continua
+                # O FFmpeg pode converter mesmo sem o probe
+                error_msg = str(probe_error)
+                if 'ffprobe' in error_msg.lower() or 'no such file' in error_msg.lower():
+                    print(f"Aviso: ffprobe não encontrado. Tentando converter sem validação prévia: {error_msg}")
+                    # Continua com a conversão mesmo sem probe
+                else:
+                    # Outro tipo de erro do probe - pode ser arquivo inválido
+                    probe_msg = probe_error.stderr.decode('utf-8', errors='ignore') if hasattr(probe_error, 'stderr') and probe_error.stderr else str(probe_error)
+                    print(f"Aviso ao fazer probe do arquivo: {probe_msg[:300]}. Tentando converter mesmo assim.")
             
             stream = ffmpeg.input(input_path_abs)
             
