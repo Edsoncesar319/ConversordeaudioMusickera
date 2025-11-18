@@ -317,6 +317,12 @@ header h1 {
     margin-top: 30px;
     display: flex;
     flex-direction: column;
+    gap: 20px;
+}
+
+.setting-group {
+    display: flex;
+    flex-direction: column;
     gap: 10px;
 }
 
@@ -326,7 +332,8 @@ header h1 {
     font-size: 0.95rem;
 }
 
-.select-quality {
+.select-quality,
+.select-format {
     background: var(--bg-hover);
     color: var(--text-primary);
     border: 2px solid var(--border-color);
@@ -336,16 +343,30 @@ header h1 {
     font-family: 'Poppins', sans-serif;
     cursor: pointer;
     transition: all 0.3s ease;
+    width: 100%;
 }
 
-.select-quality:hover {
+.select-quality:hover,
+.select-format:hover {
     border-color: var(--primary-color);
 }
 
-.select-quality:focus {
+.select-quality:focus,
+.select-format:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+@media (min-width: 600px) {
+    .settings {
+        flex-direction: row;
+        gap: 20px;
+    }
+    
+    .setting-group {
+        flex: 1;
+    }
 }
 
 .btn-convert {
@@ -565,6 +586,11 @@ header h1 {
 
 .error p {
     color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-width: 100%;
+    text-align: left;
+    line-height: 1.6;
 }
 
 footer {

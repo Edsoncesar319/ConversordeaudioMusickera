@@ -6,9 +6,11 @@ const filesList = document.getElementById('filesList');
 const filesContainer = document.getElementById('filesContainer');
 const fileCount = document.getElementById('fileCount');
 const clearAllBtn = document.getElementById('clearAllBtn');
+const formatSelect = document.getElementById('formatSelect');
 const qualitySelect = document.getElementById('qualitySelect');
 const convertBtn = document.getElementById('convertBtn');
 const convertCount = document.getElementById('convertCount');
+const formatDisplay = document.getElementById('formatDisplay');
 const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
@@ -21,6 +23,16 @@ const errorMessage = document.getElementById('errorMessage');
 
 const MAX_FILES = 15;
 let selectedFiles = [];
+
+// Formatos de áudio suportados
+const FORMATOS_AUDIO = ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'mp4', 'wma', 'aiff', 'aif', 
+                        'opus', 'amr', '3gp', 'ac3', 'eac3', 'dts', 'mp2', 'mpa', 'ra', 'rm',
+                        'au', 'snd', 'voc', 'wv', 'ape', 'tta', 'tak', 'webm'];
+
+// Atualiza o formato exibido no botão quando o formato de saída muda
+formatSelect.addEventListener('change', () => {
+    formatDisplay.textContent = formatSelect.value.toUpperCase();
+});
 
 // Event Listeners
 selectFileBtn.addEventListener('click', () => fileInput.click());
@@ -54,23 +66,34 @@ function handleFileSelect(e) {
     handleFiles(files);
 }
 
-function handleFiles(files) {
-    // Filtra apenas arquivos MP4
-    const mp4Files = files.filter(file => 
-        file.name.toLowerCase().endsWith('.mp4') || file.type.includes('mp4')
-    );
+function isAudioFile(file) {
+    // Verifica pela extensão
+    const ext = file.name.toLowerCase().split('.').pop();
+    if (FORMATOS_AUDIO.includes(ext)) {
+        return true;
+    }
+    // Verifica pelo tipo MIME
+    if (file.type && file.type.startsWith('audio/')) {
+        return true;
+    }
+    return false;
+}
 
-    if (mp4Files.length === 0) {
-        showError('Por favor, selecione arquivos MP4 válidos.');
+function handleFiles(files) {
+    // Filtra apenas arquivos de áudio
+    const audioFiles = files.filter(file => isAudioFile(file));
+
+    if (audioFiles.length === 0) {
+        showError('Por favor, selecione arquivos de áudio válidos.');
         return;
     }
 
     // Verifica limite de arquivos
-    const totalFiles = selectedFiles.length + mp4Files.length;
+    const totalFiles = selectedFiles.length + audioFiles.length;
     if (totalFiles > MAX_FILES) {
         const remaining = MAX_FILES - selectedFiles.length;
         if (remaining > 0) {
-            mp4Files.splice(remaining);
+            audioFiles.splice(remaining);
             showError(`Limite de ${MAX_FILES} arquivos. Apenas os primeiros ${remaining} foram adicionados.`);
         } else {
             showError(`Limite de ${MAX_FILES} arquivos atingido. Remova alguns arquivos antes de adicionar mais.`);
@@ -79,7 +102,7 @@ function handleFiles(files) {
     }
 
     // Adiciona arquivos únicos (evita duplicatas)
-    mp4Files.forEach(file => {
+    audioFiles.forEach(file => {
         if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
             selectedFiles.push(file);
         }
@@ -144,6 +167,7 @@ function clearAllFiles() {
 function updateConvertButton() {
     const count = selectedFiles.length;
     convertCount.textContent = count;
+    formatDisplay.textContent = formatSelect.value.toUpperCase();
     convertBtn.disabled = count === 0;
 }
 
@@ -171,7 +195,9 @@ function hideProgress() {
 }
 
 function showError(message) {
-    errorMessage.textContent = message;
+    // Substitui quebras de linha por <br> para exibição correta
+    const formattedMessage = message.replace(/\n/g, '<br>');
+    errorMessage.innerHTML = formattedMessage;
     error.style.display = 'block';
     hideResult();
     hideProgress();
@@ -211,20 +237,103 @@ async function convertFiles() {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('quality', qualitySelect.value);
+                formData.append('format', formatSelect.value);
 
-                const response = await fetch('/convert', {
+                // Log para debug
+                console.log('Enviando requisição para /convert', {
                     method: 'POST',
-                    body: formData
+                    file: file.name,
+                    format: formatSelect.value,
+                    quality: qualitySelect.value
+                });
+                
+                // Determina a URL base do servidor Flask
+                // O Flask sempre roda na porta 5000
+                const flaskPort = 5000;
+                const currentPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
+                
+                // Se não estiver na porta do Flask, usa a URL completa com a porta correta
+                let apiUrl = '/convert';
+                if (currentPort !== flaskPort.toString() && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                    apiUrl = `http://localhost:${flaskPort}/convert`;
+                }
+                
+                console.log('URL da API:', apiUrl, 'Porta atual:', currentPort, 'Porta Flask:', flaskPort);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        // Não definir Content-Type manualmente - o browser define automaticamente para FormData
+                    }
+                });
+                
+                console.log('Resposta recebida:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    contentType: response.headers.get('content-type'),
+                    ok: response.ok
                 });
 
+                // Verifica o tipo de conteúdo da resposta
+                const contentType = response.headers.get('content-type') || '';
+                
                 if (!response.ok) {
+                    // Tenta ler como JSON se for um erro
+                    let errorMessage = `Erro HTTP ${response.status}: ${response.statusText}`;
+                    try {
+                        // Clona a resposta para poder ler múltiplas vezes
+                        const responseClone = response.clone();
+                        if (contentType.includes('application/json')) {
+                            const errorData = await responseClone.json();
+                            errorMessage = errorData.error || errorMessage;
+                        } else {
+                            const text = await responseClone.text();
+                            // Tenta parsear como JSON mesmo que o content-type não seja JSON
+                            try {
+                                const jsonData = JSON.parse(text);
+                                errorMessage = jsonData.error || errorMessage;
+                            } catch {
+                                errorMessage = text || errorMessage;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Erro ao ler resposta de erro:', e);
+                        errorMessage = `Erro HTTP ${response.status}: ${response.statusText}. Não foi possível ler a mensagem de erro detalhada.`;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                // Verifica se a resposta é um arquivo (blob) ou JSON de erro
+                if (contentType.includes('application/json')) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || 'Erro na conversão');
                 }
 
                 const blob = await response.blob();
+                
+                // Verifica se o blob não está vazio
+                if (blob.size === 0) {
+                    throw new Error('Arquivo convertido está vazio. Verifique se o FFmpeg está funcionando corretamente.');
+                }
+                
                 const url = window.URL.createObjectURL(blob);
-                const filename = file.name.replace('.mp4', '.m4a');
+                
+                // Obtém o nome do arquivo do header Content-Disposition ou gera um baseado no formato
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename;
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1].replace(/['"]/g, '');
+                    } else {
+                        const ext = file.name.split('.').pop();
+                        filename = file.name.replace(`.${ext}`, `.${formatSelect.value}`);
+                    }
+                } else {
+                    const ext = file.name.split('.').pop();
+                    filename = file.name.replace(`.${ext}`, `.${formatSelect.value}`);
+                }
 
                 convertedFiles.push({
                     name: filename,
@@ -234,9 +343,10 @@ async function convertFiles() {
 
             } catch (err) {
                 console.error(`Erro ao converter ${file.name}:`, err);
+                const errorMsg = err.message || 'Erro desconhecido na conversão';
                 failedFiles.push({
                     name: file.name,
-                    error: err.message
+                    error: errorMsg
                 });
             }
         }
@@ -265,7 +375,12 @@ async function convertFiles() {
 
 function displayResults(convertedFiles, failedFiles) {
     if (convertedFiles.length === 0) {
-        showError('Nenhum arquivo foi convertido com sucesso.');
+        let errorMsg = 'Nenhum arquivo foi convertido com sucesso.';
+        if (failedFiles.length > 0) {
+            const errors = failedFiles.map(f => `\n• ${f.name}: ${f.error}`).join('');
+            errorMsg += '\n\nErros encontrados:' + errors;
+        }
+        showError(errorMsg);
         return;
     }
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conversor de Áudio MP4 para M4A</title>
+    <title>Conversor de Áudio Universal</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,8 +12,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎵 Conversor de Áudio</h1>
-            <p class="subtitle">Converta seus arquivos MP4 para M4A de forma rápida e fácil</p>
+            <h1>🎵 Conversor de Áudio Universal</h1>
+            <p class="subtitle">Converta entre todos os formatos de áudio suportados</p>
         </header>
 
         <main>
@@ -24,10 +24,10 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <h2>Arraste e solte seus arquivos MP4 aqui</h2>
+                    <h2>Arraste e solte seus arquivos de áudio aqui</h2>
                     <p>ou</p>
                     <button class="btn-select" id="selectFileBtn">Selecionar Arquivos (até 15)</button>
-                    <input type="file" id="fileInput" accept=".mp4,audio/mp4,video/mp4" multiple hidden>
+                    <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a,.mp4,.wma,.aiff,.opus,.amr,.ac3,.mp2,.webm" multiple hidden>
                     <p class="file-limit">Máximo: 15 arquivos</p>
                 </div>
             </div>
@@ -41,17 +41,37 @@
             </div>
 
             <div class="settings">
-                <label for="qualitySelect">Qualidade de Áudio:</label>
-                <select id="qualitySelect" class="select-quality">
-                    <option value="128k">128 kbps (Menor tamanho)</option>
-                    <option value="192k" selected>192 kbps (Recomendado)</option>
-                    <option value="256k">256 kbps (Alta qualidade)</option>
-                    <option value="320k">320 kbps (Máxima qualidade)</option>
-                </select>
+                <div class="setting-group">
+                    <label for="formatSelect">Formato de Saída:</label>
+                    <select id="formatSelect" class="select-format">
+                        <option value="mp3">MP3</option>
+                        <option value="wav">WAV</option>
+                        <option value="flac">FLAC</option>
+                        <option value="ogg">OGG</option>
+                        <option value="aac">AAC</option>
+                        <option value="m4a" selected>M4A</option>
+                        <option value="opus">OPUS</option>
+                        <option value="wma">WMA</option>
+                        <option value="aiff">AIFF</option>
+                        <option value="ac3">AC3</option>
+                        <option value="mp2">MP2</option>
+                        <option value="amr">AMR</option>
+                        <option value="webm">WEBM</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="qualitySelect">Qualidade de Áudio:</label>
+                    <select id="qualitySelect" class="select-quality">
+                        <option value="128k">128 kbps (Menor tamanho)</option>
+                        <option value="192k" selected>192 kbps (Recomendado)</option>
+                        <option value="256k">256 kbps (Alta qualidade)</option>
+                        <option value="320k">320 kbps (Máxima qualidade)</option>
+                    </select>
+                </div>
             </div>
 
             <button class="btn-convert" id="convertBtn" disabled>
-                <span class="btn-text">Converter <span id="convertCount">0</span> arquivo(s) para M4A</span>
+                <span class="btn-text">Converter <span id="convertCount">0</span> arquivo(s) para <span id="formatDisplay">M4A</span></span>
                 <span class="btn-loader" style="display: none;"></span>
             </button>
 
@@ -82,7 +102,8 @@
         </main>
 
         <footer>
-            <p>Conversor de Áudio MP4 para M4A | Desenvolvido por Starke ST a melhor empresa de Software do brasil</p>
+            <p>Conversor de Áudio Universal | Suporta MP3, WAV, FLAC, OGG, AAC, M4A, OPUS, WMA e muito mais</p>
+            <p>Desenvolvido por Starke ST - a melhor empresa de Software do Brasil</p>
         </footer>
     </div>
 
