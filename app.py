@@ -73,16 +73,58 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 def check_ffmpeg():
     """Verifica se o FFmpeg está instalado e acessível"""
+    # Tenta verificar com o binário configurado
     try:
         subprocess.run(
             [FFMPEG_BINARY, '-version'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            check=True
+            check=True,
+            timeout=5
         )
         return True
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
-        return False
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        pass
+    
+    # Tenta verificar com 'ffmpeg' diretamente
+    try:
+        subprocess.run(
+            ['ffmpeg', '-version'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            timeout=5
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        pass
+    
+    # Tenta verificar em locais comuns do Windows
+    if sys.platform == 'win32':
+        common_paths = [
+            r'C:\ffmpeg\bin\ffmpeg.exe',
+            r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+            r'C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe',
+            os.path.expanduser(r'~\ffmpeg\bin\ffmpeg.exe'),
+        ]
+        
+        for path in common_paths:
+            if os.path.exists(path):
+                try:
+                    subprocess.run(
+                        [path, '-version'],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=True,
+                        timeout=5
+                    )
+                    # Atualiza a variável de ambiente se encontrou
+                    os.environ['FFMPEG_BINARY'] = path
+                    return True
+                except (subprocess.CalledProcessError, OSError, subprocess.TimeoutExpired):
+                    continue
+    
+    return False
 
 
 def allowed_file(filename):
@@ -264,9 +306,14 @@ def convert():
             # Verifica se o erro é relacionado ao FFmpeg não encontrado
             error_lower = error_message.lower()
             if 'ffmpeg' in error_lower or 'not found' in error_lower or 'winerror 2' in error_lower or 'no such file' in error_lower:
-                return jsonify({
-                    'error': 'FFmpeg não encontrado. Por favor, instale o FFmpeg e adicione ao PATH do sistema.\n\nWindows: Baixe de https://ffmpeg.org/download.html ou use: choco install ffmpeg'
-                }), 500
+                # Verifica novamente se o FFmpeg está disponível
+                if not check_ffmpeg():
+                    return jsonify({
+                        'error': 'FFmpeg não encontrado. Por favor, instale o FFmpeg e adicione ao PATH do sistema.\n\n📥 Instalação no Windows:\n\n1. Chocolatey (Recomendado):\n   choco install ffmpeg\n\n2. Download Manual:\n   - Baixe de: https://www.gyan.dev/ffmpeg/builds/\n   - Extraia e adicione a pasta \\bin ao PATH\n\n3. Após instalar, feche e reabra o terminal\n4. Execute: python verificar_ffmpeg.py'
+                    }), 500
+                else:
+                    # FFmpeg foi encontrado, mas houve outro erro
+                    return jsonify({'error': f'Erro na conversão FFmpeg: {error_message[:500]}'}), 500
             
             # Extrai mensagem de erro mais útil
             if 'invalid data found' in error_lower or 'could not find codec' in error_lower:
@@ -280,10 +327,15 @@ def convert():
             error_str = str(e)
             error_lower = error_str.lower()
             
-            if 'winerror 2' in error_lower or 'ffmpeg' in error_lower or 'not found' in error_lower:
-                return jsonify({
-                    'error': 'FFmpeg não encontrado. Por favor, instale o FFmpeg e adicione ao PATH do sistema.\n\nWindows: Baixe de https://ffmpeg.org/download.html ou use: choco install ffmpeg'
-                }), 500
+            if 'winerror 2' in error_lower or 'ffmpeg' in error_lower or 'not found' in error_lower or 'no such file' in error_lower:
+                # Verifica novamente se o FFmpeg está disponível
+                if not check_ffmpeg():
+                    return jsonify({
+                        'error': 'FFmpeg não encontrado. Por favor, instale o FFmpeg e adicione ao PATH do sistema.\n\n📥 Instalação no Windows:\n\n1. Chocolatey (Recomendado):\n   choco install ffmpeg\n\n2. Download Manual:\n   - Baixe de: https://www.gyan.dev/ffmpeg/builds/\n   - Extraia e adicione a pasta \\bin ao PATH\n\n3. Após instalar, feche e reabra o terminal\n4. Execute: python verificar_ffmpeg.py\n\n⚠️ IMPORTANTE: Se o FFmpeg já está instalado, reinicie o servidor Flask!'
+                    }), 500
+                else:
+                    # FFmpeg foi encontrado, mas houve outro erro
+                    return jsonify({'error': f'Erro na conversão: {error_str[:500]}'}), 500
             
             return jsonify({'error': f'Erro inesperado: {error_str[:500]}'}), 500
         
@@ -349,18 +401,39 @@ if __name__ == '__main__':
         print("=" * 60)
         print("\nO FFmpeg é necessário para converter os arquivos de áudio.")
         print("\n📥 Como instalar o FFmpeg no Windows:")
-        print("   1. Baixe de: https://ffmpeg.org/download.html")
-        print("   2. Extraia o arquivo ZIP")
-        print("   3. Adicione a pasta 'bin' ao PATH do sistema:")
-        print("      - Pressione Win + X e escolha 'Sistema'")
-        print("      - Clique em 'Configurações avançadas do sistema'")
-        print("      - Clique em 'Variáveis de Ambiente'")
-        print("      - Em 'Variáveis do sistema', encontre 'Path' e clique em 'Editar'")
-        print("      - Clique em 'Novo' e adicione o caminho da pasta 'bin' do FFmpeg")
-        print("      - Exemplo: C:\\ffmpeg\\bin")
-        print("\n   OU use o Chocolatey (se tiver instalado):")
-        print("      choco install ffmpeg")
-        print("\n   4. Reinicie o terminal e execute este script novamente")
+        print("\n" + "-" * 60)
+        print("OPÇÃO 1: Chocolatey (Recomendado - Mais Fácil)")
+        print("-" * 60)
+        print("1. Abra o PowerShell como Administrador")
+        print("2. Execute: choco install ffmpeg")
+        print("3. Feche e reabra o terminal")
+        print("\n" + "-" * 60)
+        print("OPÇÃO 2: Download Manual")
+        print("-" * 60)
+        print("1. Baixe de: https://www.gyan.dev/ffmpeg/builds/")
+        print("   Escolha: ffmpeg-release-essentials.zip")
+        print("2. Extraia o arquivo ZIP (ex: C:\\ffmpeg)")
+        print("3. Adicione a pasta 'bin' ao PATH do sistema:")
+        print("   a) Pressione Win + X → 'Sistema'")
+        print("   b) 'Configurações avançadas do sistema'")
+        print("   c) 'Variáveis de Ambiente'")
+        print("   d) Em 'Variáveis do sistema', encontre 'Path' → 'Editar'")
+        print("   e) 'Novo' → Adicione: C:\\ffmpeg\\bin")
+        print("   f) 'OK' em todas as janelas")
+        print("4. Feche TODOS os terminais e abra um novo")
+        print("\n" + "-" * 60)
+        print("OPÇÃO 3: Scoop")
+        print("-" * 60)
+        print("1. Instale o Scoop: https://scoop.sh/")
+        print("2. Execute: scoop install ffmpeg")
+        print("\n" + "-" * 60)
+        print("Após instalar:")
+        print("-" * 60)
+        print("1. Feche TODOS os terminais abertos")
+        print("2. Abra um novo terminal")
+        print("3. Execute: python verificar_ffmpeg.py")
+        print("   OU teste: ffmpeg -version")
+        print("4. Se funcionar, execute o servidor novamente")
         print("\n" + "=" * 60)
         sys.exit(1)
     
