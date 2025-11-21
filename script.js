@@ -32,6 +32,7 @@ const FORMATOS_AUDIO = ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'mp4', 'wma',
 
 // Configurações dinâmicas
 const FALLBACK_MAX_UPLOAD_SIZE_MB = 50;
+const FALLBACK_EDGE_UPLOAD_LIMIT_MB = 50;
 const MB_IN_BYTES = 1024 * 1024;
 const PAYLOAD_LIMIT_ERROR = '__PAYLOAD_LIMIT__';
 const flaskPort = 5000;
@@ -39,6 +40,7 @@ const apiBaseUrl = getApiBaseUrl();
 const convertEndpoint = buildApiUrl('/convert');
 const configEndpoint = buildApiUrl('/api/config');
 let maxUploadSizeMB = FALLBACK_MAX_UPLOAD_SIZE_MB;
+let edgeUploadLimitMB = FALLBACK_EDGE_UPLOAD_LIMIT_MB;
 let serverConfigLoaded = false;
 let deploymentHint = '';
 
@@ -363,7 +365,7 @@ async function convertFiles() {
                 if (errorMsg === PAYLOAD_LIMIT_ERROR || isPayloadTooLarge(errorMsg)) {
                     failedFiles.push({
                         name: file.name,
-                        error: buildLargeFileError(file.name, file.size)
+                        error: buildLargeFileError(file.name, file.size, { preferEdgeLimit: true })
                     });
                     continue;
                 }
@@ -489,8 +491,12 @@ async function loadServerConfig() {
         }
         const data = await response.json();
 
-        if (typeof data.max_upload_size_mb === 'number' && data.max_upload_size_mb > 0) {
+        if (isPositiveNumber(data.max_upload_size_mb)) {
             maxUploadSizeMB = data.max_upload_size_mb;
+        }
+
+        if (isPositiveNumber(data.edge_upload_limit_mb)) {
+            edgeUploadLimitMB = data.edge_upload_limit_mb;
         }
 
         if (typeof data.deployment_hint === 'string') {
@@ -512,24 +518,25 @@ function updateFileLimitHint(hasError = false) {
     }
 
     if (hasError) {
-        fileSizeLimit.textContent = `Limite de tamanho: ${maxUploadSizeMB} MB (valor padrão)`;
+        fileSizeLimit.textContent = `Limite de tamanho: ${getReadableLimitText()} (valor padrão)`;
         return;
     }
 
     if (!serverConfigLoaded && maxUploadSizeMB === FALLBACK_MAX_UPLOAD_SIZE_MB) {
-        fileSizeLimit.textContent = `Limite de tamanho: ${maxUploadSizeMB} MB (detectando...)`;
+        fileSizeLimit.textContent = `Limite de tamanho: ${getReadableLimitText()} (detectando...)`;
         return;
     }
 
-    fileSizeLimit.textContent = `Limite de tamanho: até ${maxUploadSizeMB} MB por arquivo`;
+    fileSizeLimit.textContent = `Limite de tamanho: até ${getReadableLimitText()} por arquivo`;
 }
 
 function splitFilesBySize(files) {
-    if (!maxUploadSizeMB) {
+    const limitMB = getActiveLimitMB();
+    if (!limitMB) {
         return { validFiles: files, oversizedFiles: [] };
     }
 
-    const limitBytes = maxUploadSizeMB * MB_IN_BYTES;
+    const limitBytes = limitMB * MB_IN_BYTES;
     const oversizedFiles = [];
     const validFiles = [];
 
@@ -561,8 +568,8 @@ function buildOversizedFilesMessage(oversizedFiles) {
     return message;
 }
 
-function buildLargeFileError(fileName, fileSizeBytes) {
-    const limitText = getReadableLimitText();
+function buildLargeFileError(fileName, fileSizeBytes, options = {}) {
+    const limitText = getReadableLimitText(options.preferEdgeLimit);
     const formattedSize = formatFileSize(fileSizeBytes);
     let message = `O arquivo "${fileName}" tem ${formattedSize} e excede o limite de ${limitText} imposto pelo servidor atual.`;
 
@@ -575,11 +582,12 @@ function buildLargeFileError(fileName, fileSizeBytes) {
     return message;
 }
 
-function getReadableLimitText() {
-    if (!maxUploadSizeMB) {
+function getReadableLimitText(preferEdgeLimit = false) {
+    const limitMB = getActiveLimitMB(preferEdgeLimit);
+    if (!limitMB) {
         return 'tamanho indefinido';
     }
-    return `${maxUploadSizeMB} MB`;
+    return `${stripTrailingZeros(limitMB)} MB`;
 }
 
 function isPayloadTooLarge(message) {
@@ -590,4 +598,35 @@ function isPayloadTooLarge(message) {
     return normalized.includes('entity too large') ||
         normalized.includes('payload too large') ||
         normalized.includes('function_payload_too_large');
+}
+
+function getActiveLimitMB(preferEdgeLimit = false) {
+    const limits = [];
+    if (isPositiveNumber(maxUploadSizeMB)) {
+        limits.push(maxUploadSizeMB);
+    }
+    if (isPositiveNumber(edgeUploadLimitMB)) {
+        limits.push(edgeUploadLimitMB);
+    }
+
+    if (limits.length === 0) {
+        return undefined;
+    }
+
+    if (preferEdgeLimit && isPositiveNumber(edgeUploadLimitMB)) {
+        return edgeUploadLimitMB;
+    }
+
+    return Math.min(...limits);
+}
+
+function isPositiveNumber(value) {
+    return typeof value === 'number' && !Number.isNaN(value) && value > 0;
+}
+
+function stripTrailingZeros(value) {
+    if (Number.isInteger(value)) {
+        return value.toString();
+    }
+    return value.toFixed(2).replace(/\.?0+$/, '');
 }

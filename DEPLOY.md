@@ -66,7 +66,8 @@ git push
 
 No dashboard da Vercel, adicione variáveis de ambiente se precisar:
 - `FFMPEG_PATH` - Caminho do FFmpeg (se disponível)
-- `MAX_UPLOAD_SIZE_MB` - Limite máximo aceito por upload (ex.: 50 para plano Pro). O frontend mostra o limite atual e bloqueia arquivos maiores.
+- `MAX_UPLOAD_SIZE_MB` - Limite máximo aceito pelo Flask (ex.: 100 MB). O frontend mostra o limite.
+- `EDGE_UPLOAD_LIMIT_MB` - Limite imposto antes do Flask (Vercel Hobby ~4.5MB, Pro 50MB). Use números com casas decimais se necessário (ex.: 4.5).
 - `PYTHONUNBUFFERED=1` - Já configurado no vercel.json
 
 ### Limites da Vercel:
@@ -75,7 +76,7 @@ No dashboard da Vercel, adicione variáveis de ambiente se precisar:
 - **Tamanho máximo de upload**: 4.5MB (Hobby), 50MB (Pro)
 - **Memória**: 1024MB
 
-> Se precisar converter arquivos com mais de 50MB, execute o app localmente (`python app.py`) ou use a CLI (`python conversor_audio.py arquivo.mp4`). A Vercel retornará `FUNCTION_PAYLOAD_TOO_LARGE` quando o arquivo exceder o limite configurado.
+> Se precisar converter arquivos com mais de 50MB, execute o app localmente (`python app.py`) ou use a CLI (`python conversor_audio.py arquivo.mp4`). A Vercel retornará `FUNCTION_PAYLOAD_TOO_LARGE` quando o arquivo exceder o limite configurado no edge, mesmo que o Flask aceite valores maiores.
 
 ## 📝 Notas
 

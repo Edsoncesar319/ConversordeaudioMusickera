@@ -20,8 +20,20 @@ import ffmpeg
 app = Flask(__name__)
 
 # Configurações globais
-MAX_UPLOAD_SIZE_MB = int(os.environ.get('MAX_UPLOAD_SIZE_MB', '100'))
-app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+def _to_float(value, default):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+MAX_UPLOAD_SIZE_MB = _to_float(os.environ.get('MAX_UPLOAD_SIZE_MB', '100'), 100)
+EDGE_UPLOAD_LIMIT_MB = _to_float(
+    os.environ.get('EDGE_UPLOAD_LIMIT_MB', str(MAX_UPLOAD_SIZE_MB)),
+    MAX_UPLOAD_SIZE_MB
+)
+
+app.config['MAX_CONTENT_LENGTH'] = int(MAX_UPLOAD_SIZE_MB * 1024 * 1024)
 
 # Configura CORS para permitir todas as origens e métodos
 CORS(app, resources={
@@ -398,7 +410,7 @@ def request_entity_too_large(error):
     return jsonify({
         'error': (
             f'Arquivo muito grande para o ambiente atual. '
-            f'Tamanho máximo permitido: {MAX_UPLOAD_SIZE_MB}MB.\n\n'
+            f'Tamanho máximo permitido: {MAX_UPLOAD_SIZE_MB:g}MB.\n\n'
             'Para converter arquivos maiores, execute o app localmente '
             '(python app.py) ou utilize a linha de comando.'
         )
@@ -415,6 +427,7 @@ def get_config():
     )
     return jsonify({
         'max_upload_size_mb': MAX_UPLOAD_SIZE_MB,
+        'edge_upload_limit_mb': EDGE_UPLOAD_LIMIT_MB,
         'ffmpeg_binary': FFMPEG_BINARY,
         'deployment_hint': deploy_hint
     })

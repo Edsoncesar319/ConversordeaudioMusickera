@@ -85,16 +85,19 @@ vercel env add FFMPEG_PATH ./bin/ffmpeg
 ```
 (Ajuste o caminho conforme a localização real do binário no projeto.)
 
-### 3. Ajustar o limite de upload (`MAX_UPLOAD_SIZE_MB`)
-- Define o limite máximo aceito pelo servidor/infraestrutura
-- Em ambientes com restrição (ex.: Vercel Hobby 4.5MB, Pro 50MB) ajuste conforme necessário:
+### 3. Ajustar os limites de upload (`MAX_UPLOAD_SIZE_MB` / `EDGE_UPLOAD_LIMIT_MB`)
+- `MAX_UPLOAD_SIZE_MB`: limite aceito pelo Flask (processamento)
+- `EDGE_UPLOAD_LIMIT_MB`: limite imposto pela borda/provedor (antes do Flask)
+- Exemplos na Vercel:
 ```bash
-vercel env add MAX_UPLOAD_SIZE_MB 50
+vercel env add MAX_UPLOAD_SIZE_MB 100     # Quanto o FFmpeg suporta processar
+vercel env add EDGE_UPLOAD_LIMIT_MB 4.5   # Hobby (use 50 no plano Pro)
 ```
 - Localmente você pode liberar valores maiores:
 ```bash
 # Windows (PowerShell)
 $env:MAX_UPLOAD_SIZE_MB=500
+$env:EDGE_UPLOAD_LIMIT_MB=500
 python app.py
 ```
 
