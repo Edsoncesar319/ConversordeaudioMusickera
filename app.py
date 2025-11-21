@@ -18,6 +18,11 @@ from flask_cors import CORS
 import ffmpeg
 
 app = Flask(__name__)
+
+# Configurações globais
+MAX_UPLOAD_SIZE_MB = int(os.environ.get('MAX_UPLOAD_SIZE_MB', '100'))
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
 # Configura CORS para permitir todas as origens e métodos
 CORS(app, resources={
     r"/convert": {
@@ -390,7 +395,29 @@ def method_not_allowed(error):
 @app.errorhandler(413)
 def request_entity_too_large(error):
     """Trata arquivos muito grandes"""
-    return jsonify({'error': 'Arquivo muito grande. Tamanho máximo: 100MB'}), 413
+    return jsonify({
+        'error': (
+            f'Arquivo muito grande para o ambiente atual. '
+            f'Tamanho máximo permitido: {MAX_UPLOAD_SIZE_MB}MB.\n\n'
+            'Para converter arquivos maiores, execute o app localmente '
+            '(python app.py) ou utilize a linha de comando.'
+        )
+    }), 413
+
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Retorna informações de configuração para o frontend"""
+    deploy_hint = os.environ.get(
+        'DEPLOYMENT_HINT',
+        'Em produção (Vercel), uploads grandes são bloqueados. '
+        'Para arquivos maiores, execute localmente: python app.py'
+    )
+    return jsonify({
+        'max_upload_size_mb': MAX_UPLOAD_SIZE_MB,
+        'ffmpeg_binary': FFMPEG_BINARY,
+        'deployment_hint': deploy_hint
+    })
 
 
 if __name__ == '__main__':
@@ -436,9 +463,6 @@ if __name__ == '__main__':
         print("4. Se funcionar, execute o servidor novamente")
         print("\n" + "=" * 60)
         sys.exit(1)
-    
-    # Configura o tamanho máximo de upload (100MB)
-    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
     
     print("=" * 50)
     print("🎵 Servidor de Conversão de Áudio")

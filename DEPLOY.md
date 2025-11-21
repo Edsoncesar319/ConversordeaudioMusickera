@@ -66,6 +66,7 @@ git push
 
 No dashboard da Vercel, adicione variáveis de ambiente se precisar:
 - `FFMPEG_PATH` - Caminho do FFmpeg (se disponível)
+- `MAX_UPLOAD_SIZE_MB` - Limite máximo aceito por upload (ex.: 50 para plano Pro). O frontend mostra o limite atual e bloqueia arquivos maiores.
 - `PYTHONUNBUFFERED=1` - Já configurado no vercel.json
 
 ### Limites da Vercel:
@@ -73,6 +74,8 @@ No dashboard da Vercel, adicione variáveis de ambiente se precisar:
 - **Timeout**: 10 segundos (Hobby), 60 segundos (Pro)
 - **Tamanho máximo de upload**: 4.5MB (Hobby), 50MB (Pro)
 - **Memória**: 1024MB
+
+> Se precisar converter arquivos com mais de 50MB, execute o app localmente (`python app.py`) ou use a CLI (`python conversor_audio.py arquivo.mp4`). A Vercel retornará `FUNCTION_PAYLOAD_TOO_LARGE` quando o arquivo exceder o limite configurado.
 
 ## 📝 Notas
 

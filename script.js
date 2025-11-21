@@ -20,6 +20,7 @@ const downloadLinks = document.getElementById('downloadLinks');
 const downloadAllBtn = document.getElementById('downloadAllBtn');
 const error = document.getElementById('error');
 const errorMessage = document.getElementById('errorMessage');
+const fileSizeLimit = document.getElementById('fileSizeLimit');
 
 const MAX_FILES = 15;
 let selectedFiles = [];
@@ -28,6 +29,18 @@ let selectedFiles = [];
 const FORMATOS_AUDIO = ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'mp4', 'wma', 'aiff', 'aif', 
                         'opus', 'amr', '3gp', 'ac3', 'eac3', 'dts', 'mp2', 'mpa', 'ra', 'rm',
                         'au', 'snd', 'voc', 'wv', 'ape', 'tta', 'tak', 'webm'];
+
+// Configurações dinâmicas
+const FALLBACK_MAX_UPLOAD_SIZE_MB = 50;
+const MB_IN_BYTES = 1024 * 1024;
+const PAYLOAD_LIMIT_ERROR = '__PAYLOAD_LIMIT__';
+const flaskPort = 5000;
+const apiBaseUrl = getApiBaseUrl();
+const convertEndpoint = buildApiUrl('/convert');
+const configEndpoint = buildApiUrl('/api/config');
+let maxUploadSizeMB = FALLBACK_MAX_UPLOAD_SIZE_MB;
+let serverConfigLoaded = false;
+let deploymentHint = '';
 
 // Atualiza o formato exibido no botão quando o formato de saída muda
 formatSelect.addEventListener('change', () => {
@@ -60,6 +73,9 @@ uploadArea.addEventListener('drop', (e) => {
 
 uploadArea.addEventListener('click', () => fileInput.click());
 
+// Inicialização
+initializeApp();
+
 // Funções
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
@@ -88,12 +104,17 @@ function handleFiles(files) {
         return;
     }
 
+    const { validFiles, oversizedFiles } = splitFilesBySize(audioFiles);
+    if (oversizedFiles.length > 0) {
+        showError(buildOversizedFilesMessage(oversizedFiles));
+    }
+
     // Verifica limite de arquivos
-    const totalFiles = selectedFiles.length + audioFiles.length;
+    const totalFiles = selectedFiles.length + validFiles.length;
     if (totalFiles > MAX_FILES) {
-        const remaining = MAX_FILES - selectedFiles.length;
+        const remaining = Math.max(MAX_FILES - selectedFiles.length, 0);
         if (remaining > 0) {
-            audioFiles.splice(remaining);
+            validFiles.splice(remaining);
             showError(`Limite de ${MAX_FILES} arquivos. Apenas os primeiros ${remaining} foram adicionados.`);
         } else {
             showError(`Limite de ${MAX_FILES} arquivos atingido. Remova alguns arquivos antes de adicionar mais.`);
@@ -102,15 +123,19 @@ function handleFiles(files) {
     }
 
     // Adiciona arquivos únicos (evita duplicatas)
-    audioFiles.forEach(file => {
+    let filesAdded = 0;
+    validFiles.forEach(file => {
         if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
             selectedFiles.push(file);
+            filesAdded += 1;
         }
     });
 
     updateFilesList();
     updateConvertButton();
-    hideError();
+    if (filesAdded > 0 && oversizedFiles.length === 0) {
+        hideError();
+    }
 }
 
 function updateFilesList() {
@@ -247,22 +272,7 @@ async function convertFiles() {
                     quality: qualitySelect.value
                 });
                 
-                // Determina a URL base do servidor Flask
-                // Em produção (Vercel), usa URL relativa
-                // Em desenvolvimento local, detecta a porta correta
-                const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-                const flaskPort = 5000;
-                const currentPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
-                
-                // Se não estiver na porta do Flask e estiver em desenvolvimento local, usa a URL completa
-                let apiUrl = '/convert';
-                if (!isProduction && currentPort !== flaskPort.toString()) {
-                    apiUrl = `http://localhost:${flaskPort}/convert`;
-                }
-                
-                console.log('URL da API:', apiUrl, 'Porta atual:', currentPort, 'Produção:', isProduction);
-                
-                const response = await fetch(apiUrl, {
+                const response = await fetch(convertEndpoint, {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -281,6 +291,10 @@ async function convertFiles() {
                 const contentType = response.headers.get('content-type') || '';
                 
                 if (!response.ok) {
+                    if (response.status === 413) {
+                        throw new Error(PAYLOAD_LIMIT_ERROR);
+                    }
+
                     // Tenta ler como JSON se for um erro
                     let errorMessage = `Erro HTTP ${response.status}: ${response.statusText}`;
                     try {
@@ -346,6 +360,14 @@ async function convertFiles() {
             } catch (err) {
                 console.error(`Erro ao converter ${file.name}:`, err);
                 const errorMsg = err.message || 'Erro desconhecido na conversão';
+                if (errorMsg === PAYLOAD_LIMIT_ERROR || isPayloadTooLarge(errorMsg)) {
+                    failedFiles.push({
+                        name: file.name,
+                        error: buildLargeFileError(file.name, file.size)
+                    });
+                    continue;
+                }
+
                 failedFiles.push({
                     name: file.name,
                     error: errorMsg
@@ -430,4 +452,142 @@ function displayResults(convertedFiles, failedFiles) {
         const errorMsg = `\n\n${failedFiles.length} arquivo(s) falharam:\n${failedFiles.map(f => `- ${f.name}`).join('\n')}`;
         showError(`Alguns arquivos não puderam ser convertidos.${errorMsg}`);
     }
+}
+
+function initializeApp() {
+    updateFileLimitHint();
+    loadServerConfig();
+}
+
+function getApiBaseUrl() {
+    const hostname = window.location.hostname;
+    const currentPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (isLocalhost && currentPort !== flaskPort.toString()) {
+        return `http://localhost:${flaskPort}`;
+    }
+
+    return '';
+}
+
+function buildApiUrl(path) {
+    if (!apiBaseUrl) {
+        return path;
+    }
+    if (path.startsWith('/')) {
+        return `${apiBaseUrl}${path}`;
+    }
+    return `${apiBaseUrl}/${path}`;
+}
+
+async function loadServerConfig() {
+    try {
+        const response = await fetch(configEndpoint);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (typeof data.max_upload_size_mb === 'number' && data.max_upload_size_mb > 0) {
+            maxUploadSizeMB = data.max_upload_size_mb;
+        }
+
+        if (typeof data.deployment_hint === 'string') {
+            deploymentHint = data.deployment_hint;
+        }
+
+        serverConfigLoaded = true;
+        updateFileLimitHint();
+    } catch (err) {
+        console.warn('Não foi possível carregar as configurações do servidor. Usando fallback.', err);
+        serverConfigLoaded = false;
+        updateFileLimitHint(true);
+    }
+}
+
+function updateFileLimitHint(hasError = false) {
+    if (!fileSizeLimit) {
+        return;
+    }
+
+    if (hasError) {
+        fileSizeLimit.textContent = `Limite de tamanho: ${maxUploadSizeMB} MB (valor padrão)`;
+        return;
+    }
+
+    if (!serverConfigLoaded && maxUploadSizeMB === FALLBACK_MAX_UPLOAD_SIZE_MB) {
+        fileSizeLimit.textContent = `Limite de tamanho: ${maxUploadSizeMB} MB (detectando...)`;
+        return;
+    }
+
+    fileSizeLimit.textContent = `Limite de tamanho: até ${maxUploadSizeMB} MB por arquivo`;
+}
+
+function splitFilesBySize(files) {
+    if (!maxUploadSizeMB) {
+        return { validFiles: files, oversizedFiles: [] };
+    }
+
+    const limitBytes = maxUploadSizeMB * MB_IN_BYTES;
+    const oversizedFiles = [];
+    const validFiles = [];
+
+    files.forEach(file => {
+        if (file.size > limitBytes) {
+            oversizedFiles.push(file);
+        } else {
+            validFiles.push(file);
+        }
+    });
+
+    return { validFiles, oversizedFiles };
+}
+
+function buildOversizedFilesMessage(oversizedFiles) {
+    const limitText = getReadableLimitText();
+    const list = oversizedFiles
+        .map(file => `• ${file.name} (${formatFileSize(file.size)})`)
+        .join('\n');
+
+    let message = `Alguns arquivos foram ignorados porque excedem o limite de ${limitText}.\n\n${list}`;
+
+    if (deploymentHint) {
+        message += `\n\n${deploymentHint}`;
+    } else {
+        message += '\n\nDica: Para converter arquivos maiores, execute o app localmente (python app.py) ou utilize o conversor via linha de comando.';
+    }
+
+    return message;
+}
+
+function buildLargeFileError(fileName, fileSizeBytes) {
+    const limitText = getReadableLimitText();
+    const formattedSize = formatFileSize(fileSizeBytes);
+    let message = `O arquivo "${fileName}" tem ${formattedSize} e excede o limite de ${limitText} imposto pelo servidor atual.`;
+
+    if (deploymentHint) {
+        message += `\n\n${deploymentHint}`;
+    } else {
+        message += '\n\nExecute o aplicativo localmente (python app.py) para converter arquivos grandes ou use a linha de comando: python conversor_audio.py <arquivo.mp4>';
+    }
+
+    return message;
+}
+
+function getReadableLimitText() {
+    if (!maxUploadSizeMB) {
+        return 'tamanho indefinido';
+    }
+    return `${maxUploadSizeMB} MB`;
+}
+
+function isPayloadTooLarge(message) {
+    if (!message) {
+        return false;
+    }
+    const normalized = message.toLowerCase();
+    return normalized.includes('entity too large') ||
+        normalized.includes('payload too large') ||
+        normalized.includes('function_payload_too_large');
 }

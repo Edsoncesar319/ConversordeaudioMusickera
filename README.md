@@ -85,7 +85,20 @@ vercel env add FFMPEG_PATH ./bin/ffmpeg
 ```
 (Ajuste o caminho conforme a localização real do binário no projeto.)
 
-### 3. Executar o deploy
+### 3. Ajustar o limite de upload (`MAX_UPLOAD_SIZE_MB`)
+- Define o limite máximo aceito pelo servidor/infraestrutura
+- Em ambientes com restrição (ex.: Vercel Hobby 4.5MB, Pro 50MB) ajuste conforme necessário:
+```bash
+vercel env add MAX_UPLOAD_SIZE_MB 50
+```
+- Localmente você pode liberar valores maiores:
+```bash
+# Windows (PowerShell)
+$env:MAX_UPLOAD_SIZE_MB=500
+python app.py
+```
+
+### 4. Executar o deploy
 ```bash
 # Primeiro deploy (preview)
 vercel
